@@ -47,4 +47,4 @@ echo " " > snapshotsize.txt
 echo " " > calculatetemp.txt
 
 #MAILING Generated Attachments to Recipients
-echo "Attaching Generated Documents for the Run on $today . Total Savings Done are $TotalCost $ " | mutt -s "DAILY-RDS-SNAPSHOT-DELETION-JOB-RUN" zakamble@globe.com.ph -a SnapshotListBackup_`date +"%Y-%m-%d"`.csv DeletedSnapshots_`date +"%Y-%m-%d"`.txt
+echo "Attaching Generated Documents for the Run on $today . Total Savings Done are $TotalCost $ " | mutt -s "DAILY-RDS-SNAPSHOT-DELETION-JOB-RUN" kambleashish004@gmail.com -a SnapshotListBackup_`date +"%Y-%m-%d"`.csv DeletedSnapshots_`date +"%Y-%m-%d"`.txt
