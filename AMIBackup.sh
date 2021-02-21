@@ -11,7 +11,7 @@ echo $Deployment
 echo $InstanceName >> scriptdata.txt
 
 
-AMID=$(aws ec2 create-image --instance-id $instance --name $InstanceName-$today --description $ticket-$InstanceName-$today-GOLDEN --no-reboot --output text)
+AMID=$(aws ec2 create-image --instance-id $instance --name $InstanceName-$today --description $InstanceName-$today --no-reboot --output text)
 echo $AMID >> scriptdata.txt
 echo $AMID
 
