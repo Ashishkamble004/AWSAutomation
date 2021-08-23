@@ -1,0 +1,67 @@
+---
+schemaVersion: "2.2"
+description: "Setup CloudWatch Metrics Script"
+mainSteps:
+- action: "aws:runShellScript"
+  name: "SetupScriptsDirectory"
+  inputs:
+    runCommand:
+    - "sudo su; cd /root; mkdir scripts; cd /root/scripts; touch cloudwatch.sh; touch diskutilization.sh"
+- action: "aws:runShellScript"
+  name: "CloudWatchMemoryScript"
+  inputs:
+    runCommand:
+    - "cd /root/scripts/"
+    - echo "#"\!"/bin/bash" >> cloudwatch.sh
+    - echo "USEDMEMORY=$""(free -m | awk 'NR==2{printf "\"%.2f"\\t""\", ""$""3*100/""$""2 }')" >> cloudwatch.sh
+    - echo "TPERMEM=$""(free -t | awk 'NR == 2 "{print "$"3}"')" >> cloudwatch.sh
+    - echo "TAVAIL=$""(free -t | awk 'NR == 2 "{print "$"4}"')" >> cloudwatch.sh
+    - echo "PERMEM=$""((TPERMEM / 1000))" >> cloudwatch.sh
+    - echo "AVAIL=$""((TAVAIL / 1000))" >> cloudwatch.sh
+    - echo "InstIDvar=$""(curl http://169.254.169.254/latest/meta-data/instance-id)" >> cloudwatch.sh
+    - echo "HOSTNAMEvar=$""(hostname)" >> cloudwatch.sh
+    - echo "/usr/bin/aws cloudwatch put-metric-data --metric-name MemoryUtilization --dimensions Instance=""$""HOSTNAMEvar --dimensions InstanceId=""$""InstIDvar  --namespace "\"System/Linux"\" --value ""$""USEDMEMORY --unit Percent --region ap-southeast-1" >> cloudwatch.sh
+    - echo "/usr/bin/aws cloudwatch put-metric-data --metric-name MemoryUsed --dimensions Instance=""$""HOSTNAMEvar --dimensions InstanceId=""$""InstIDvar  --namespace "\"System/Linux"\" --value ""$""PERMEM --unit Megabytes --region ap-southeast-1" >> cloudwatch.sh
+    - echo "/usr/bin/aws cloudwatch put-metric-data --metric-name MemoryAvailable --dimensions Instance=""$""HOSTNAMEvar --dimensions InstanceId=""$""InstIDvar  --namespace "\"System/Linux"\" --value ""$""AVAIL --unit Megabytes --region ap-southeast-1" >> cloudwatch.sh
+    - echo "echo $"USEDMEMORY "$"PERMEM "$"AVAIL >> cloudwatch.sh
+    - "cd /root/scripts/"
+- action: "aws:runShellScript"
+  name: "DiskUtilizationScript"
+  inputs:
+    runCommand:
+    - "cd /root/scripts/"
+    - echo "#"\!"/bin/bash" >> diskutilization.sh
+    - echo "InstIDvar=$""(curl http://169.254.169.254/latest/meta-data/instance-id)" >> diskutilization.sh
+    - echo "HOSTNAMEvar=$""(hostname)" >> diskutilization.sh
+    - echo "for i in "\`"(df -H | grep -vE "\'^"Filesystem|tmpfs|cdrom"\'" | awk '{ print ""$""1}')"\`"" >> diskutilization.sh
+    - echo "do" >> diskutilization.sh
+    - echo "echo $"i"" >> diskutilization.sh
+    - echo "for j in "\`"(df -H ""$""i | grep -vE "\'^"Filesystem|tmpfs|cdrom"\'" | awk '{ print ""$""5 }' | tr -d %)"\`"" >> diskutilization.sh
+    - echo "do" >> diskutilization.sh
+    - echo "echo $"j"" >> diskutilization.sh
+    - echo "/usr/bin/aws cloudwatch put-metric-data --metric-name ""$""i --dimensions Instance=""$""HOSTNAMEvar --dimensions InstanceId=""$""InstIDvar  --namespace "\"""DiskNS\"""" --value ""$""j --unit Percent --region ap-southeast-1" >> diskutilization.sh
+    - echo "done" >> diskutilization.sh
+    - echo "done" >> diskutilization.sh
+- action: "aws:runShellScript"
+  name: "AddingExecutePermission"
+  inputs:
+    runCommand:
+    - "cd /root/scripts/; chmod +x cloudwatch.sh diskutilization.sh"
+- action: "aws:runShellScript"
+  name: "ExecuteCloudWatchScript"
+  inputs:
+    runCommand:
+    - "cd /root/scripts/"
+    - "./cloudwatch.sh"
+- action: "aws:runShellScript"
+  name: "ExecuteDiskUtilScript"
+  inputs:
+    runCommand:
+    - "cd /root/scripts"
+    - "./diskutilization.sh"
+- action: "aws:runShellScript"
+  name: "AddingCronJob"
+  inputs:
+    runCommand:
+    - crontab -l | { cat; echo "*/15 * * * * /root/scripts/diskutilization.sh >> /root/scripts/cloudwatch"\`date +"\\%d"\\%m\\%y""""""\`".log 2>&1"; } | crontab -
+    - crontab -l | { cat; echo "*/15 * * * * /root/scripts/cloudwatch.sh >> /root/scripts/cloudwatch"\`date +"\\%d"\\%m\\%y""""""\`".log 2>&1"; } | crontab -
