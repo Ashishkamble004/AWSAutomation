@@ -28,7 +28,7 @@
           "}",
           "",
           "check_binary apt APT",
-          "check_binary yum YUM"
+          "check_binary yum YUM",
           "",
           "if [ $HAS_APT -eq 0 ]",
           "then",
