@@ -1,0 +1,63 @@
+{
+  "schemaVersion": "2.2",
+  "description": "Checks and performs yum update or apt update on Linux operating system.",
+  "parameters": {},
+  "mainSteps": [
+    {
+      "precondition": {
+        "StringEquals": [
+          "platformType",
+          "Linux"
+        ]
+      },
+      "action": "aws:runShellScript",
+      "name": "UpdateLinuxPackages",
+      "inputs": {
+        "timeoutSeconds": 7200,
+        "runCommand": [
+          "#!/bin/bash",
+          "",
+          "check_binary() {",
+          "    HAS_VAR_NAME=HAS_$2",
+          "    CMD_VAR_NAME=$2_CMD",
+          "    if [ \"$(eval echo \\${${HAS_VAR_NAME}})\" = \"0\" ]; then return; fi",
+          "    which $1 2>/dev/null",
+          "    RET_CODE=$?",
+          "    eval \"${HAS_VAR_NAME}=${RET_CODE}\"",
+          "    if [ ${RET_CODE} -eq 0 ]; then eval \"${CMD_VAR_NAME}=$1\"; fi",
+          "}",
+          "",
+          "check_binary apt APT",
+          "check_binary yum YUM",
+          "check_binary zypper ZYPPER",
+          "",
+          "if [ $HAS_APT -eq 0 ]",
+          "then",
+          "    apt update -y",
+          "    apt upgrade -y",
+          "",
+          "elif [ $HAS_YUM -eq 0 ]",
+          "then",
+          "",
+          "    YUM_VERSION=$(yum --version 2>/dev/null | sed -n 1p)",
+          "    echo \"Using Yum version: $YUM_VERSION\"",
+          "    yum update -y --skip-broken",
+          "",
+          "elif [ $HAS_ZYPPER -eq 0 ]",
+          "then",
+          "",
+          "    sudo zypper refresh",
+          "    sudo zypper update -y",
+          "",
+          "else",
+          "    echo \"A supported package manager not found. Require APT or YUM or ZIPPER\"",
+          "    echo \"Exiting...\"",
+          "    exit 1",
+          "fi",
+          "reboot",
+          "exit 0"
+        ]
+      }
+    }
+  ]
+}
