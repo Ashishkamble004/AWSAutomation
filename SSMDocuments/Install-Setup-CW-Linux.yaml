@@ -1,0 +1,77 @@
+---
+schemaVersion: '2.2'
+description: "Install and configure CloudWatch Agent on Linux EC2 instance"
+mainSteps:
+  - action: aws:runShellScript
+    name: installCloudWatchAgent
+    inputs:
+      runCommand:
+        - yum install -y amazon-cloudwatch-agent
+
+  - action: aws:runShellScript
+    name: configureCloudWatchAgent
+    inputs:
+      runCommand:
+        - |
+          cat <<EOF > /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json
+          {
+            "agent": {
+              "metrics_collection_interval": 60,
+              "logfile": "/var/log/amazon-cloudwatch-agent/amazon-cloudwatch-agent.log",
+              "region": "us-west-2"
+            },
+            "metrics": {
+              "append_dimensions": {
+                "InstanceId": "${aws:InstanceId}"
+              },
+              "metrics_collected": {
+                "cpu": {
+                  "measurement": [
+                    "usage_idle",
+                    "usage_iowait",
+                    "usage_user",
+                    "usage_system"
+                  ],
+                  "metrics_collection_interval": 60,
+                  "resources": [
+                    "*"
+                  ]
+                },
+                "memory": {
+                  "measurement": [
+                    "mem_used_percent"
+                  ],
+                  "metrics_collection_interval": 60
+                },
+                "disk": {
+                  "measurement": [
+                    "used_percent"
+                  ],
+                  "metrics_collection_interval": 60,
+                  "resources": [
+                    "*"
+                  ]
+                }
+              }
+            },
+            "logs": {
+              "logs_collected": {
+                "files": {
+                  "collect_list": [
+                    {
+                      "file_path": "/path/to/your/log/file.log",
+                      "log_group_name": "your-log-group",
+                      "log_stream_name": "{instance_id}"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+          EOF
+
+  - action: aws:runShellScript
+    name: startCloudWatchAgent
+    inputs:
+      runCommand:
+        - sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json -s
