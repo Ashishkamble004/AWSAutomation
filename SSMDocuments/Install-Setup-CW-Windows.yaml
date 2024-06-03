@@ -1,0 +1,80 @@
+---
+schemaVersion: '2.2'
+description: "Install and configure CloudWatch Agent on Windows EC2 instance"
+mainSteps:
+  - action: aws:runPowerShellScript
+    name: installCloudWatchAgent
+    inputs:
+      runCommand:
+        - $ErrorActionPreference = 'Stop'
+        - Invoke-WebRequest https://s3.amazonaws.com/amazoncloudwatch-agent/windows/amd64/latest/amazon-cloudwatch-agent.msi -OutFile C:\Temp\amazon-cloudwatch-agent.msi
+        - Start-Process msiexec.exe -ArgumentList '/i C:\Temp\amazon-cloudwatch-agent.msi /quiet' -NoNewWindow -Wait
+
+  - action: aws:runPowerShellScript
+    name: configureCloudWatchAgent
+    inputs:
+      runCommand:
+        - $agentConfig = @"
+          {
+            "agent": {
+              "metrics_collection_interval": 60,
+              "logfile": "C:\\ProgramData\\Amazon\\AmazonCloudWatchAgent\\Logs\\amazon-cloudwatch-agent.log",
+              "region": "us-west-2"
+            },
+            "metrics": {
+              "append_dimensions": {
+                "InstanceId": "${aws:InstanceId}"
+              },
+              "metrics_collected": {
+                "cpu": {
+                  "measurement": [
+                    "usage_idle",
+                    "usage_iowait",
+                    "usage_user",
+                    "usage_system"
+                  ],
+                  "metrics_collection_interval": 60,
+                  "resources": [
+                    "*"
+                  ]
+                },
+                "memory": {
+                  "measurement": [
+                    "mem_used_percent"
+                  ],
+                  "metrics_collection_interval": 60
+                },
+                "disk": {
+                  "measurement": [
+                    "used_percent"
+                  ],
+                  "metrics_collection_interval": 60,
+                  "resources": [
+                    "*"
+                  ]
+                }
+              }
+            },
+            "logs": {
+              "logs_collected": {
+                "files": {
+                  "collect_list": [
+                    {
+                      "file_path": "C:\\path\\to\\your\\log\\file.log",
+                      "log_group_name": "your-log-group",
+                      "log_stream_name": "{instance_id}"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+          "@
+
+        - Set-Content -Path "C:\\ProgramData\\Amazon\\AmazonCloudWatchAgent\\amazon-cloudwatch-agent.json" -Value $agentConfig
+
+  - action: aws:runPowerShellScript
+    name: startCloudWatchAgent
+    inputs:
+      runCommand:
+        - & $Env:ProgramFiles\Amazon\AmazonCloudWatchAgent\amazon-cloudwatch-agent-ctl.ps1 -a fetch-config -m ec2 -c file:"C:\\ProgramData\\Amazon\\AmazonCloudWatchAgent\\amazon-cloudwatch-agent.json" -s
